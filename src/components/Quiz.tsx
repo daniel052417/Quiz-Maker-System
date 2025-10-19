@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 
 interface Question {
   question: string;
-  answer: string;
+  answer: string | string[];
   category: string;
 }
 
@@ -17,7 +17,7 @@ interface QuizConfig {
 interface AnswerRecord {
   question: string;
   userAnswer: string;
-  correctAnswer: string;
+  correctAnswer: string | string[];
   isCorrect: boolean;
   skipped: boolean;
   category: string;
@@ -111,47 +111,60 @@ const Quiz: React.FC = () => {
   };
 
   const handleTimeout = () => {
-    const currentQuestion = questions[currentIndex];
-    const newRecord: AnswerRecord = {
-      question: currentQuestion.question,
-      userAnswer: '(Time expired)',
-      correctAnswer: currentQuestion.answer,
-      isCorrect: false,
-      skipped: false,
-      category: currentQuestion.category
-    };
-    
-    setAnswerRecords([...answerRecords, newRecord]);
-    setFeedback('wrong');
-    
-    const newAnswered = [...answeredQuestions];
-    newAnswered[currentIndex] = true;
-    setAnsweredQuestions(newAnswered);
+  const currentQuestion = questions[currentIndex];
+  const newRecord: AnswerRecord = {
+    question: currentQuestion.question,
+    userAnswer: '(Time expired)',
+    correctAnswer: Array.isArray(currentQuestion.answer) 
+      ? currentQuestion.answer[0] 
+      : currentQuestion.answer,
+    isCorrect: false,
+    skipped: false,
+    category: currentQuestion.category
   };
+  
+  setAnswerRecords([...answerRecords, newRecord]);
+  setFeedback('wrong');
+  
+  const newAnswered = [...answeredQuestions];
+  newAnswered[currentIndex] = true;
+  setAnsweredQuestions(newAnswered);
+};
 
   const handleSubmit = () => {
-    if (feedback !== null || userAnswer.trim() === '') return;
+  if (feedback !== null || userAnswer.trim() === '') return;
 
-    const currentQuestion = questions[currentIndex];
-    const isCorrect = userAnswer.trim().toLowerCase() === currentQuestion.answer.toLowerCase();
+  const currentQuestion = questions[currentIndex];
+  const userAnswerLower = userAnswer.trim().toLowerCase();
+  
+  // Check if answer matches any of the acceptable answers
+  const acceptableAnswers = Array.isArray(currentQuestion.answer) 
+    ? currentQuestion.answer 
+    : [currentQuestion.answer];
+  
+  const isCorrect = acceptableAnswers.some(
+    ans => ans.toLowerCase() === userAnswerLower
+  );
 
-    const newRecord: AnswerRecord = {
-      question: currentQuestion.question,
-      userAnswer: userAnswer.trim(),
-      correctAnswer: currentQuestion.answer,
-      isCorrect,
-      skipped: false,
-      category: currentQuestion.category
-    };
-
-    setAnswerRecords([...answerRecords, newRecord]);
-    setFeedback(isCorrect ? 'correct' : 'wrong');
-    setScore(isCorrect ? score + 1 : score);
-
-    const newAnswered = [...answeredQuestions];
-    newAnswered[currentIndex] = true;
-    setAnsweredQuestions(newAnswered);
+  const newRecord: AnswerRecord = {
+    question: currentQuestion.question,
+    userAnswer: userAnswer.trim(),
+    correctAnswer: Array.isArray(currentQuestion.answer) 
+      ? currentQuestion.answer[0] 
+      : currentQuestion.answer,
+    isCorrect,
+    skipped: false,
+    category: currentQuestion.category
   };
+
+  setAnswerRecords([...answerRecords, newRecord]);
+  setFeedback(isCorrect ? 'correct' : 'wrong');
+  setScore(isCorrect ? score + 1 : score);
+
+  const newAnswered = [...answeredQuestions];
+  newAnswered[currentIndex] = true;
+  setAnsweredQuestions(newAnswered);
+};
 
   const handleSkip = () => {
     if (feedback !== null) return;
@@ -203,13 +216,15 @@ const Quiz: React.FC = () => {
   };
 
   const getHint = () => {
-    const answer = questions[currentIndex].answer;
-    const words = answer.split(' ');
-    if (words.length === 1) {
-      return `${answer[0]}${'_'.repeat(answer.length - 1)} (${answer.length} letters)`;
-    }
-    return `${words.length} word(s), starts with "${answer[0]}"`;
-  };
+  const answer = Array.isArray(questions[currentIndex].answer) 
+    ? questions[currentIndex].answer[0] 
+    : questions[currentIndex].answer;
+  const words = answer.split(' ');
+  if (words.length === 1) {
+    return `${answer[0]}${'_'.repeat(answer.length - 1)} (${answer.length} letters)`;
+  }
+  return `${words.length} word(s), starts with "${answer[0]}"`;
+};
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -246,11 +261,12 @@ const Quiz: React.FC = () => {
   };
 
   const startEdit = (index: number) => {
-    setEditIndex(index);
-    setNewQuestion(allQuestions[index].question);
-    setNewAnswer(allQuestions[index].answer);
-    setNewCategory(allQuestions[index].category);
-  };
+  setEditIndex(index);
+  setNewQuestion(allQuestions[index].question);
+  const answer = allQuestions[index].answer;
+  setNewAnswer(Array.isArray(answer) ? answer.join(' / ') : answer);
+  setNewCategory(allQuestions[index].category);
+};
 
   const saveEdit = () => {
     if (editIndex !== null && newQuestion.trim() && newAnswer.trim() && newCategory.trim()) {
@@ -581,7 +597,11 @@ const Quiz: React.FC = () => {
                         <div key={index} className="bg-red-50 border-2 border-red-200 rounded-lg p-4 ml-2">
                           <p className="font-semibold text-gray-800 mb-2">{record.question}</p>
                           <p className="text-sm text-red-700">Your answer: {record.userAnswer}</p>
-                          <p className="text-sm text-green-700 font-semibold">Correct answer: {record.correctAnswer}</p>
+                          <p className="text-sm text-green-700 font-semibold">
+                            Correct answer: {Array.isArray(record.correctAnswer) 
+                              ? record.correctAnswer.join(' / ') 
+                              : record.correctAnswer}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -693,7 +713,11 @@ const Quiz: React.FC = () => {
               </p>
               {feedback === 'wrong' && (
                 <p className="text-gray-700 mt-1">
-                  The correct answer is: <span className="font-semibold">{currentQuestion.answer}</span>
+                  The correct answer is: <span className="font-semibold">
+                    {Array.isArray(currentQuestion.answer) 
+                      ? currentQuestion.answer.join(' / ') 
+                      : currentQuestion.answer}
+                  </span>
                 </p>
               )}
             </div>
